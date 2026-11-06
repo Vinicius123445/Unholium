@@ -54,6 +54,7 @@ class DebugMenuScene {
         return ids.sort((a, b) => (w.npcs[a].map === g.map.id ? 0 : 1) - (w.npcs[b].map === g.map.id ? 0 : 1)).map((id) => ({ label: `${w.displayName(id)} (${G.NPCS[id].name})`, sub: w.npcs[id].map, act: () => this.npcMenu(id) }));
       }
       case 'World': return [
+        { label: 'Physics test (one body)', act: () => G.scenes.push(new G.PhysTestScene(g)) },
         ...[6, 9, 12, 15, 18, 21, 0, 3].map((h) => ({ label: `Set time to ${String(h).padStart(2, '0')}:00`, act: () => G.debug.time(h) })),
         { label: '+1 hour', act: () => { w.skipHours(1); g.resyncNPCs(); } }, { label: '+1 day', act: () => G.debug.days(1) },
         { label: '+3 days', act: () => G.debug.days(3) }, { label: '+1 week', act: () => G.debug.days(7) }, { label: '+2 weeks', act: () => G.debug.days(14) },

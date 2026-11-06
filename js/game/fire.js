@@ -278,7 +278,9 @@ class FireSystem {
 
   draw(ctx, view, time) {
     G.fireHD.draw(ctx, this, view, time);   // (js/game/firehd.js)
-    for (const s of this.smoke) { const a = Math.min(0.4, s.t * 0.22); ctx.fillStyle = `rgba(70,66,62,${a.toFixed(3)})`; ctx.beginPath(); ctx.arc(s.x, s.y, Math.max(0.5, (s.big ? 5 : 2.5) + (2.4 - s.t) * 2.2), 0, Math.PI * 2); ctx.fill(); }
+    const disc = G.fireHD.disc(70), was = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = true;
+    for (const s of this.smoke) { const q = Math.max(0.5, (s.big ? 5 : 2.5) + (2.4 - s.t) * 2.2); if (s.x + q < view.x || s.x - q > view.x + view.w || s.y + q < view.y || s.y - q > view.y + view.h) continue; ctx.globalAlpha = Math.min(0.4, s.t * 0.22); ctx.drawImage(disc, s.x - q, s.y - q, q * 2, q * 2); }
+    ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = was;
     for (const p of this.projectiles) { const k = p.t / p.dur; const x = G.util.lerp(p.sx, p.tx, k), y = G.util.lerp(p.sy, p.ty, k) - Math.sin(k * Math.PI) * 20; ctx.drawImage(G.assets.icon('firebomb'), x - 5, y - 5, 10, 10); }
   }
 }

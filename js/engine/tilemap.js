@@ -19,6 +19,15 @@ G.ROOF_COLORS = {
   brown: ['#7a5a3a', '#664a2e', '#4e3822'],
 };
 
+// what every tile id means for walking and paths, as flat tables (rebuilt if tiles are added: a custom world brings its own)
+const TileFacts = { n: 0, t: null, of() {
+  const ids = Object.values(G.T), max = ids.reduce((a, b) => Math.max(a, b), 0) + 1; if (this.t && this.n === ids.length) return this.t;
+  const solid = new Uint8Array(max), water = new Uint8Array(max), cost = new Uint8Array(max).fill(1), T = G.T;
+  for (const id of ids) { const d = G.TILES[id]; if (d) { solid[id] = d.solid ? 1 : 0; water[id] = d.water ? 1 : 0; } }
+  for (const id of [T.path, T.cobble, T.plaza, T.bridge, T.dock, T.dirt, T.woodfloor, T.stonefloor, T.carpet, T.door, T.darkstone, T.sidewalk, T.concrete, T.tilefloor, T.lot, T.court]) if (id != null) cost[id] = 0;
+  for (const id of [T.asphalt, T.road_line, T.road_line_v]) if (id != null) cost[id] = 3;
+  this.n = ids.length; return (this.t = { solid, water, cost });
+} };
 class TileMap {
   constructor(id, w, h, fill = 1) {
     this.id = id;
@@ -122,9 +131,9 @@ class TileMap {
 
   // ---------- finalize ----------
   computeSolids() {
-    for (let i = 0; i < this.ground.length; i++) this.solid[i] = G.TILES[this.ground[i]].solid ? 1 : 0;
-    this.swimmable = new Uint8Array(this.ground.length);
-    for (let i = 0; i < this.ground.length; i++) this.swimmable[i] = G.TILES[this.ground[i]].water ? 1 : 0;
+    // (what each kind of tile means, worked out once per kind: these three loops run over every tile of every map, many times while a world is planned)
+    const T = TileFacts.of(), g = this.ground, n = g.length, solid = this.solid, swim = this.swimmable = new Uint8Array(n);
+    for (let i = 0; i < n; i++) { const k = g[i]; solid[i] = T.solid[k]; swim[i] = T.water[k]; }
     for (const d of this.decor) {
       if (!d.def.solid) continue;
       const fw = d.def.fw || 1, fh = d.def.fh || 1;
@@ -134,11 +143,8 @@ class TileMap {
     this.buildDecorIndex();
     // prefer roads for pathing: off-road tiles cost a little extra
     this.pathCost = new Uint8Array(this.w * this.h);
-    const roads = new Set([G.T.path, G.T.cobble, G.T.plaza, G.T.bridge, G.T.dock, G.T.dirt, G.T.woodfloor, G.T.stonefloor, G.T.carpet, G.T.door, G.T.darkstone,
-      G.T.asphalt, G.T.road_line, G.T.road_line_v, G.T.sidewalk, G.T.concrete, G.T.tilefloor, G.T.lot, G.T.court]);
     // people keep to sidewalks and paths: walking along the road itself (where cars drive) costs the most
-    const traffic = new Set([G.T.asphalt, G.T.road_line, G.T.road_line_v]);
-    for (let i = 0; i < this.ground.length; i++) this.pathCost[i] = traffic.has(this.ground[i]) ? 3 : roads.has(this.ground[i]) ? 0 : 1;
+    const pc = this.pathCost; for (let i = 0; i < n; i++) pc[i] = T.cost[g[i]];
   }
 
   // Remove vegetation/rocks that ended up on named points (NPC waypoints, spawns, beds).
@@ -253,7 +259,7 @@ class TileMap {
 
   redrawTile(tx, ty) {
     if (!this.inBounds(tx, ty) || !this.groundCtx) return;
-    this.drawTileInto(this.groundCtx, tx, ty, true);
+    if (this.groundCanvas.each) this.groundCanvas.each(tx * 16 - 16, ty * 16 - 16, 48, 48, (q) => this.drawTileInto(q, tx, ty, true)); else this.drawTileInto(this.groundCtx, tx, ty, true);
     if (this.minimap) {
       const mc = this.minimap.getContext('2d');
       mc.fillStyle = G.TILES[this.ground[ty * this.w + tx]].mini;
@@ -449,7 +455,7 @@ class TileMap {
   drawGround(ctx, view, time) {
     const sx = Math.max(0, Math.floor(view.x)), sy = Math.max(0, Math.floor(view.y));
     const sw = Math.min(this.pw - sx, Math.ceil(view.w)), sh = Math.min(this.ph - sy, Math.ceil(view.h));
-    if (sw > 0 && sh > 0) ctx.drawImage(this.groundCanvas, sx, sy, sw, sh, sx, sy, sw, sh);
+    if (sw > 0 && sh > 0) { if (this.groundCanvas.draw) this.groundCanvas.draw(ctx, sx, sy, sw, sh); else ctx.drawImage(this.groundCanvas, sx, sy, sw, sh, sx, sy, sw, sh); }
     // animated water
     const frame = Math.floor(time * 2.5) % 4;
     const tx0 = Math.max(0, Math.floor(view.x / 16)), ty0 = Math.max(0, Math.floor(view.y / 16));

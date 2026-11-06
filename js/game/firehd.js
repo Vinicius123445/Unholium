@@ -34,8 +34,32 @@ function material(fs, i) {
 }
 const CORE = ['#fff6d0', '#ffe066', '#ffc23a', '#ff9a2a', '#f06a1e', '#c83a14', '#7a1e0e'];
 
+// A flame is rows of pixels. Drawn row by row that is one call per row, per tongue, per tile, per frame: thousands, and a big fire stalled the frame.
+// Each shape is now painted once into a sheet and stamped from it: same rows, same colours, same flicker, a call per tongue.
+const TAU = Math.PI * 2, PAGE_W = 256, PAGE_H = 260, CELL_W = 32, CELL_H = 52, PHASES = 20, ACROSS = 8, PER_PAGE = 40, MOST_PAGES = 96;   // (small pages: a new shape sends one page to the graphics card, not everything)
+let pages = [], slots = new Map(), nextSlot = 0;
+const tongue = (ctx, rows, w0, phase, wind, odd, bx, by) => {
+  const w = Math.round(w0 * 3) / 3, ph = Math.floor(phase / TAU * PHASES) % PHASES, wi = Math.round(wind * 5) / 5, n = Math.min(rows, CELL_H - 2), key = n + Math.round(w * 3) * 64 + ph * 16384 + (odd ? 524288 : 0) + (Math.round(wi * 5) + 512) * 1048576;
+  let s = slots.get(key);
+  if (s === undefined) {
+    if (nextSlot >= PER_PAGE * MOST_PAGES) { pages = []; slots = new Map(); nextSlot = 0; }   // (all the shapes a fire can take rarely fit: start again)
+    s = nextSlot++; slots.set(key, s);
+    if (s % PER_PAGE === 0) { const c = document.createElement('canvas'); c.width = PAGE_W; c.height = PAGE_H; pages.push(c); }
+    const sx = pages[Math.floor(s / PER_PAGE)].getContext('2d'), i = s % PER_PAGE, X = (i % ACROSS) * CELL_W, Y = Math.floor(i / ACROSS) * CELL_H, cx = X + CELL_W / 2, base = Y + CELL_H - 1, a = (ph + 0.5) / PHASES * TAU;
+    for (let r = 0; r < n; r++) {
+      const t = r / n, ww = Math.max(0.6, w * (1 - t * 0.85) + (t < 0.2 ? 0.6 : 0)), sway = Math.sin(a + r * 0.45) * t * 1.8 + wi * t * 4;
+      sx.fillStyle = CORE[Math.min(CORE.length - 1, Math.floor(t * (CORE.length - 0.5) + (odd ? 0.6 : 0)))];
+      sx.fillRect(Math.max(X, Math.min(X + CELL_W - 1, Math.round(cx - ww / 2 + sway))), base - r, Math.min(CELL_W - 1, Math.max(1, Math.round(ww))), 1);
+    }
+  }
+  const i = s % PER_PAGE;
+  ctx.drawImage(pages[Math.floor(s / PER_PAGE)], (i % ACROSS) * CELL_W, Math.floor(i / ACROSS) * CELL_H, CELL_W, CELL_H, Math.round(bx) - CELL_W / 2, Math.round(by) - CELL_H + 1, CELL_W, CELL_H);
+};
+const discs = new Map();
 G.fireHD = {
   embers: [], puffs: [],
+  // a soft puff of smoke: a ready disc of its grey, scaled and faded
+  disc(g) { let d = discs.get(g); if (!d) { d = document.createElement('canvas'); d.width = d.height = 64; const x = d.getContext('2d'); x.fillStyle = `rgb(${g},${g - 2},${g - 4})`; x.beginPath(); x.arc(32, 32, 32, 0, TAU); x.fill(); discs.set(g, d); } return d; },
   draw(ctx, fs, view, time) {
     const W = fs.map.w, wind = G.breeze ? G.breeze.dx : 0.3, big = fs.cells.size, dt = Math.max(0, Math.min(0.1, time - (this._t || time))); this._t = time;
     this._dt = dt;
@@ -61,13 +85,7 @@ G.fireHD = {
         const ph = s * 20, f = 6 + s2 * 6;
         const H = m.h * heat * (0.55 + 0.45 * fuel) * (0.75 + 0.25 * Math.sin(time * f + ph) + 0.15 * Math.sin(time * f * 2.3 + ph * 1.7));
         const w0 = m.w * (0.8 + s * 0.6) * (0.85 + 0.15 * Math.sin(time * 9 + ph));
-        const rows = Math.max(2, Math.round(H));
-        for (let r = 0; r < rows; r++) {
-          const t = r / rows, ww = Math.max(0.6, w0 * (1 - t * 0.85) + (t < 0.2 ? 0.6 : 0));
-          const sway = Math.sin(time * 4 + ph + r * 0.45) * t * 1.8 + wind * t * 4;
-          ctx.fillStyle = CORE[Math.min(CORE.length - 1, Math.floor(t * (CORE.length - 0.5) + (k % 2) * 0.6))];
-          ctx.fillRect(Math.round(bx - ww / 2 + sway), Math.round(by - r), Math.max(1, Math.round(ww)), 1);
-        }
+        tongue(ctx, Math.max(2, Math.round(H)), w0, ((time * 4 + ph) % TAU + TAU) % TAU, wind, k % 2, bx, by);
         // the white-hot base
         if (heat > 0.6) { ctx.fillStyle = 'rgba(255,250,220,0.85)'; ctx.fillRect(Math.round(bx - 1), Math.round(by), 2, 1); }
       }
@@ -87,14 +105,16 @@ G.fireHD = {
       else { ctx.fillStyle = `rgba(255,${120 + Math.round(80 * Math.sin(e.t * 20) ** 2)},40,${a.toFixed(2)})`; ctx.fillRect(Math.round(e.x), Math.round(e.y), 1, 1); }
     }
     this.embers = this.embers.filter((e) => e.t < e.life).slice(-220);
-    // smoke
+    // smoke (only what is on screen is drawn; all of it keeps moving)
+    const V = G.renderer.viewRect ? G.renderer.viewRect() : { x: G.renderer.cam.x, y: G.renderer.cam.y, w: G.renderer.viewW, h: G.renderer.viewH }, was = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = true;
     for (const p of this.puffs) {
       p.t += dt; p.y -= (8 + p.t * 3) * dt; p.x += (wind * 10 + Math.sin(p.t + p.r) * 2) * dt; p.r += dt * 2.2;
       const a = Math.min(1, p.t * 1.5) * (1 - p.t / p.life) * 0.3;   // soft, see-through puffs (no dark blobs)
       const g = Math.round(150 - p.dark * 65);
-      ctx.fillStyle = `rgba(${g},${g - 2},${g - 4},${a.toFixed(3)})`;
-      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.5, p.r), 0, Math.PI * 2); ctx.fill();
+      if (p.x + p.r < V.x || p.x - p.r > V.x + V.w || p.y + p.r < V.y || p.y - p.r > V.y + V.h) continue;
+      const d = G.fireHD.disc(g), q = Math.max(0.5, p.r); ctx.globalAlpha = a; ctx.drawImage(d, p.x - q, p.y - q, q * 2, q * 2);
     }
+    ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = was;
     this.puffs = this.puffs.filter((p) => p.t < p.life).slice(-260);
   },
 
@@ -112,7 +132,7 @@ G.fireHD = {
     for (let ty = ty0 - 1; ty <= ty1 + 1 && !any; ty++) for (let tx = tx0 - 1; tx <= tx1 + 1; tx++) if (val(tx, ty)) { any = true; break; }
     if (!any) return;
     // written to a scorch overlay (drawn over the ground), never read back from the big ground canvas
-    if (!map.scorchCanvas || map.scorchCanvas.width !== map.w * 16) { map.scorchCanvas = document.createElement('canvas'); map.scorchCanvas.width = map.w * 16; map.scorchCanvas.height = map.h * 16; }
+    if (!map.scorchCanvas || map.scorchCanvas.width !== map.w * 16) map.scorchCanvas = new G.PatchLayer(map.w * 16, map.h * 16);
     const img = new ImageData(w, h), d = img.data;
     const base = (X, Y, def) => { const c = G.assets.tile(def.tex, def.anim ? 0 : G.util.hash2(Math.floor(X / 16), Math.floor(Y / 16), 7)); if (!c) return null; let t = texC.get(c); if (!t) { t = c.getContext('2d').getImageData(0, 0, 16, 16).data; texC.set(c, t); } return t; };
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -139,7 +159,7 @@ G.fireHD = {
       else { r = r * 0.86 + 22; g = g * 0.82 + 14; b = b * 0.75; }                   // lightly singed
       d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = 255;
     }
-    map.scorchCanvas.getContext('2d').putImageData(img, px0, py0);
+    map.scorchCanvas.put(img, px0, py0);
   },
   scorchAll(map) {
     const seen = new Set();
@@ -173,7 +193,7 @@ TM.drawGround = function (ctx, view, time) {
     }
   }
   const r = _dg.call(this, ctx, view, time);
-  if (this.scorchCanvas) { const sx = Math.max(0, Math.floor(view.x)), sy = Math.max(0, Math.floor(view.y)), sw = Math.min(this.pw - sx, Math.ceil(view.w)), sh2 = Math.min(this.ph - sy, Math.ceil(view.h)); if (sw > 0 && sh2 > 0) ctx.drawImage(this.scorchCanvas, sx, sy, sw, sh2, sx, sy, sw, sh2); }
+  if (this.scorchCanvas) { const sx = Math.max(0, Math.floor(view.x)), sy = Math.max(0, Math.floor(view.y)), sw = Math.min(this.pw - sx, Math.ceil(view.w)), sh2 = Math.min(this.ph - sy, Math.ceil(view.h)); if (sw > 0 && sh2 > 0) this.scorchCanvas.draw(ctx, sx, sy, sw, sh2); }
   return r;
 };
 })();

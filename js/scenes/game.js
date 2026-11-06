@@ -463,10 +463,10 @@ class GameScene {
       if (d < 18) consider(d + 4, { type: 'container', ref: c, label: c.kind === 'chest' ? `Open ${(c.name || "Chest").toLowerCase()}${c.owner && this.world.isAlive(c.owner) ? ' (owned)' : ''}` : c.kind === 'bag' ? G.groundLoot.label(c) : `Search ${c.name || "Container"}` });
     }
     const tx = Math.floor(px / 16), ty = Math.floor(py / 16);
-    for (const d of this.map.decor.concat(this.map.flats)) {
-      if (!d.def.interact || !sameSide(this.map.buildingAtTile(d.tx, d.ty))) continue;
+    for (const list of [this.map.decor, this.map.flats]) for (const d of list) {   // (what is out of reach goes first: most of the map, every frame)
+      if (d.ty < ty - 1 || d.ty > ty + 1 || !d.def.interact) continue;
       const fw = d.def.fw || 1;
-      if (tx >= d.tx - 1 && tx <= d.tx + fw && ty >= d.ty - 1 && ty <= d.ty + 1) {
+      if (tx >= d.tx - 1 && tx <= d.tx + fw && sameSide(this.map.buildingAtTile(d.tx, d.ty))) {
         const dd = G.util.dist(px, py, d.x, d.y - 6);
         if (dd < 24) consider(dd + 8, { type: 'decor', ref: d, label: this.decorLabel(d) });
       }

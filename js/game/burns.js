@@ -16,7 +16,8 @@
 (() => {
 const FS = G.FireSystem.prototype, TM = G.TileMap.prototype, GS = G.GameScene.prototype;
 const fract = (v) => v - Math.floor(v), h2 = (x, y, s) => fract(Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453);
-function vn(x, y, sc, s) { const gx = x / sc, gy = y / sc, x0 = Math.floor(gx), y0 = Math.floor(gy); let fx = gx - x0, fy = gy - y0; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); const a = h2(x0, y0, s), b = h2(x0 + 1, y0, s), c = h2(x0, y0 + 1, s), d = h2(x0 + 1, y0 + 1, s); return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy; }
+const CELLS = [];   // (the corners of a noise cell, worked out once per cell and not once per pixel)
+function vn(x, y, sc, s) { const gx = x / sc, gy = y / sc, x0 = Math.floor(gx), y0 = Math.floor(gy); let fx = gx - x0, fy = gy - y0; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); const q = CELLS[s] || (CELLS[s] = { x0: NaN, y0: 0, sc: 0, a: 0, b: 0, c: 0, d: 0 }); if (q.x0 !== x0 || q.y0 !== y0 || q.sc !== sc) { q.x0 = x0; q.y0 = y0; q.sc = sc; q.a = h2(x0, y0, s); q.b = h2(x0 + 1, y0, s); q.c = h2(x0, y0 + 1, s); q.d = h2(x0 + 1, y0 + 1, s); } const { a, b, c, d } = q; return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy; }
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const DIR_ANG = [Math.PI / 2, Math.PI, 0, -Math.PI / 2];
 const minutes = () => (G.world ? G.world.day * 1440 + G.world.minutes : 0);
@@ -412,7 +413,7 @@ G.drawDecor = function (ctx, o, s, scene) {
 function sootQ(map, i) { (map._sootQ = map._sootQ || new Set()).add(i); }
 function paintSoot(map, tx, ty) {
   const m = G.world && G.world.mapMods && G.world.mapMods[map.id], S = m && m.soot; if (!S) return;
-  if (!map.sootCanvas || map.sootCanvas.width !== map.w * 16) { map.sootCanvas = document.createElement('canvas'); map.sootCanvas.width = map.w * 16; map.sootCanvas.height = map.h * 16; }
+  if (!map.sootCanvas || map.sootCanvas.width !== map.w * 16) map.sootCanvas = new G.PatchLayer(map.w * 16, map.h * 16);
   const x0 = Math.max(0, tx - 1), y0 = Math.max(0, ty - 1), x1 = Math.min(map.w - 1, tx + 1), y1 = Math.min(map.h - 1, ty + 1);
   const w = (x1 - x0 + 1) * 16, h = (y1 - y0 + 1) * 16, img = new ImageData(w, h), d = img.data;
   const lv = (x, y) => (map.inBounds(x, y) ? S[y * map.w + x] || 0 : 0);
@@ -428,14 +429,14 @@ function paintSoot(map, tx, ty) {
     const p = (y * w + x) * 4, k = h2(X, Y, 24);
     d[p] = 16 + k * 10; d[p + 1] = 13 + k * 8; d[p + 2] = 11 + k * 7; d[p + 3] = a * 255;
   }
-  map.sootCanvas.getContext('2d').putImageData(img, x0 * 16, y0 * 16);
+  map.sootCanvas.put(img, x0 * 16, y0 * 16);
 }
 const _tdg = TM.drawGround;
 TM.drawGround = function (ctx, view, time) {
   const r = _tdg.apply(this, arguments);
   const q = this._sootQ;
   if (q && q.size && G.world) { let n = 0; for (const i of q) { q.delete(i); try { paintSoot(this, i % this.w, Math.floor(i / this.w)); } catch (e) { /* plain */ } if (++n >= 6) break; } }
-  if (this.sootCanvas) { const sx = Math.max(0, Math.floor(view.x)), sy = Math.max(0, Math.floor(view.y)), sw = Math.min(this.pw - sx, Math.ceil(view.w)), sh = Math.min(this.ph - sy, Math.ceil(view.h)); if (sw > 0 && sh > 0) ctx.drawImage(this.sootCanvas, sx, sy, sw, sh, sx, sy, sw, sh); }
+  if (this.sootCanvas) { const sx = Math.max(0, Math.floor(view.x)), sy = Math.max(0, Math.floor(view.y)), sw = Math.min(this.pw - sx, Math.ceil(view.w)), sh = Math.min(this.ph - sy, Math.ceil(view.h)); if (sw > 0 && sh > 0) this.sootCanvas.draw(ctx, sx, sy, sw, sh); }
   return r;
 };
 

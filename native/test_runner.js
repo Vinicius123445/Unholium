@@ -3,7 +3,7 @@
 const only = process.argv[2];
 process.argv.push(`--search=?test&only=${only}`);
 process.env.UNHOLIUM_DATA = process.env.UNHOLIUM_DATA || `D:/Unholium_native/tools/tmp/td_${process.pid}`;
-process.env.UNHOLIUM_MUTE = process.env.UNHOLIUM_MUTE || '0'; process.env.UNHOLIUM_BROWSERLIKE = '1';   // (the suite was written for a page with no desktop host)
+process.env.UNHOLIUM_NOPAD = '1'; process.env.UNHOLIUM_MUTE = process.env.UNHOLIUM_MUTE || '0'; process.env.UNHOLIUM_BROWSERLIKE = '1';   // (the suite was written for a page with no desktop host)
 process.env.W = process.env.W || '1280'; process.env.H = process.env.H || '720';
 const fs = require('fs'), R = require('./runtime');
 process.on('uncaughtException', (e) => { console.log('UNCAUGHT', e.stack); });

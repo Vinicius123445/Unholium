@@ -8,7 +8,7 @@ const scratch = document.createElement('canvas'), sx = scratch.getContext('2d', 
 scratch.width = scratch.height = (CH + M * 2) * 16;
 const blendable = (m) => !(m.meta && (m.meta.indoor || m.meta.floorOf));
 const start = (m) => {
-  if (!m.groundCanvas) { const { c, x } = A.mk(m.w * 16, m.h * 16); m.groundCanvas = c; m.groundCtx = x; }
+  if (!m.groundCanvas) { m.groundCanvas = new G.PatchLayer(m.w * 16, m.h * 16); m.groundCtx = m.groundCanvas.context; }
   m.windowAt = new Map();
   const cols = Math.ceil(m.w / CH), rows = Math.ceil(m.h / CH), g = m._gc = { cols, rows, done: new Uint8Array(cols * rows), left: cols * rows, flats: [], wins: [], blds: [], tick: 0 };
   const list = (o, i) => (o[i] || (o[i] = []));
@@ -49,18 +49,19 @@ const paint = (m, cx, cy) => {
   x.setTransform(1, 0, 0, 1, 0, 0);
   if (blendable(m)) try { G.terrain.blend(m, { x0, y0, x1, y1, ix0, iy0, ix1, iy1, ctx: x }); } catch (e) { G.reportError && G.reportError(e); }
   const w = (ix1 - ix0 + 1) * 16, h = (iy1 - iy0 + 1) * 16;
-  m.groundCtx.drawImage(scratch, (ix0 - x0) * 16, (iy0 - y0) * 16, w, h, ix0 * 16, iy0 * 16, w, h);
+  m.groundCanvas.each(ix0 * 16, iy0 * 16, w, h, (q) => q.drawImage(scratch, (ix0 - x0) * 16, (iy0 - y0) * 16, w, h, ix0 * 16, iy0 * 16, w, h));
 };
 // everything on screen now; then one more square, nearest first
 const keepUp = (m, view) => {
   const g = m._gc; if (!g || g.left <= 0) return;
   const c0 = Math.max(0, Math.floor(view.x / 16 / CH)), r0 = Math.max(0, Math.floor(view.y / 16 / CH)), c1 = Math.min(g.cols - 1, Math.floor((view.x + view.w) / 16 / CH)), r1 = Math.min(g.rows - 1, Math.floor((view.y + view.h) / 16 / CH));
   for (let cy = r0; cy <= r1; cy++) for (let cx = c0; cx <= c1; cx++) paint(m, cx, cy);
-  if (g.left <= 0 || (g.tick = (g.tick + 1) % 2)) return;
+  // one square ahead of you when the last one was cheap; the slower it was, the longer until the next: a busy graphics card never gets two heavy frames in a row
+  if (g.left <= 0 || (g.wait = (g.wait || 0) - 1) > 0) return;
   const mx = (c0 + c1) >> 1, my = (r0 + r1) >> 1, R = Math.max(g.cols, g.rows);
   for (let r = 1; r <= R; r++) for (let cy = my - r; cy <= my + r; cy++) for (let cx = mx - r; cx <= mx + r; cx++) {
     if (Math.max(Math.abs(cx - mx), Math.abs(cy - my)) !== r || cx < 0 || cy < 0 || cx >= g.cols || cy >= g.rows || g.done[cy * g.cols + cx]) continue;
-    paint(m, cx, cy); return;
+    const a = performance.now(); paint(m, cx, cy); g.wait = Math.min(40, 2 + Math.ceil((performance.now() - a) / 5)); return;
   }
 };
 const _pre = TM.prerender, _dg = TM.drawGround, _set = TM.setTileRuntime;

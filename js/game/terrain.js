@@ -24,11 +24,15 @@ const AMP = 6;   // how far a border wanders, in pixels
 const fract = (v) => v - Math.floor(v);
 const h2 = (x, y, s) => fract(Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453);
 // smooth value noise in [0,1]
+// (neighbouring pixels share a noise cell, and the four corners of a cell never change: they are worked out once per cell, not once per pixel)
+const CELLS = [];
 function vn(x, y, scale, s) {
   const gx = x / scale, gy = y / scale, x0 = Math.floor(gx), y0 = Math.floor(gy);
   let fx = gx - x0, fy = gy - y0;
   fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
-  const a = h2(x0, y0, s), b = h2(x0 + 1, y0, s), c = h2(x0, y0 + 1, s), d = h2(x0 + 1, y0 + 1, s);
+  const q = CELLS[s] || (CELLS[s] = { x0: NaN, y0: 0, scale: 0, a: 0, b: 0, c: 0, d: 0 });
+  if (q.x0 !== x0 || q.y0 !== y0 || q.scale !== scale) { q.x0 = x0; q.y0 = y0; q.scale = scale; q.a = h2(x0, y0, s); q.b = h2(x0 + 1, y0, s); q.c = h2(x0, y0 + 1, s); q.d = h2(x0 + 1, y0 + 1, s); }
+  const { a, b, c, d } = q;
   return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
 }
 // how far the border is pushed toward the lower-priority side at this world pixel (negative: the other way)
@@ -189,8 +193,8 @@ G.terrain = {
       if (!mask.some(Boolean)) continue;
       const frames = [0, 1, 2, 3].map((f) => {
         const c = document.createElement('canvas'); c.width = c.height = 16;
-        const x = c.getContext('2d'); x.drawImage(G.assets.tiles[def.tex][f], 0, 0);
-        const im = x.getImageData(0, 0, 16, 16);
+        // (the tile's pixels are already at hand: no drawing it and reading it back, four times for every tile along the water)
+        const x = c.getContext('2d'), im = x.createImageData(16, 16); im.data.set(texData(G.assets.tiles[def.tex][f]));
         for (let k = 0; k < 256; k++) if (mask[k]) { const src = texData(G.assets.tiles[mask[k]][f]); im.data[k * 4] = src[k * 4]; im.data[k * 4 + 1] = src[k * 4 + 1]; im.data[k * 4 + 2] = src[k * 4 + 2]; }
         x.putImageData(im, 0, 0);
         return c;
@@ -230,7 +234,7 @@ TM.drawGround = function (ctx, view, time) {
   if (!this.landOverlay) return _dg.call(this, ctx, view, time);
   const sx = Math.max(0, Math.floor(view.x)), sy = Math.max(0, Math.floor(view.y));
   const sw = Math.min(this.pw - sx, Math.ceil(view.w)), sh = Math.min(this.ph - sy, Math.ceil(view.h));
-  if (sw > 0 && sh > 0) ctx.drawImage(this.groundCanvas, sx, sy, sw, sh, sx, sy, sw, sh);
+  if (sw > 0 && sh > 0) { if (this.groundCanvas.draw) this.groundCanvas.draw(ctx, sx, sy, sw, sh); else ctx.drawImage(this.groundCanvas, sx, sy, sw, sh, sx, sy, sw, sh); }
   const frame = Math.floor(time * 2.5) % 4;
   const tx0 = Math.max(0, Math.floor(view.x / 16)), ty0 = Math.max(0, Math.floor(view.y / 16));
   const tx1 = Math.min(this.w - 1, Math.floor((view.x + view.w) / 16)), ty1 = Math.min(this.h - 1, Math.floor((view.y + view.h) / 16));

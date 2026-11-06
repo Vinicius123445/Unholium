@@ -90,7 +90,7 @@ if (process.env.UNHOLIUM_MUTE !== '1') {
 }
 
 // ---------------------------------------------------------------- gamepads: SDL knows Xbox, PlayStation, Switch and many others; XInput is the fallback
-let pads = () => [];
+let pads = () => [];   // (a machine with a controller plugged in: tests never read it, UNHOLIUM_NOPAD)
 const sdlPads = () => {
   const koffi = require('koffi'), dll = [path.join(__dirname, 'SDL3.dll'), path.join(ROOT, 'tools', 'sdl', 'SDL3.dll')].find((f) => fs.existsSync(f)); if (!dll) throw new Error('no SDL3.dll');
   const S = koffi.load(dll), f = (d) => S.func(d), hint = f('bool SDL_SetHint(const char *, const char *)');
@@ -133,7 +133,7 @@ try {
   };
 } catch (e2) { console.log('no gamepad support:', e2.message); }
 }
-Object.defineProperty(g, 'navigator', { value: { getGamepads: () => pads(), userAgent: 'UnholiumNative', language: 'en', languages: ['en'], onLine: true }, configurable: true });
+Object.defineProperty(g, 'navigator', { value: { getGamepads: () => (process.env.UNHOLIUM_NOPAD ? [] : pads()), userAgent: 'UnholiumNative', language: 'en', languages: ['en'], onLine: true }, configurable: true });
 
 // ---------------------------------------------------------------- the host: what Host.cs did
 const webview = hub();

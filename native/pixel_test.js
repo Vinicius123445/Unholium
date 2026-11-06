@@ -2,7 +2,7 @@
 // The picture, held still: four scenes from the same dice, compared pixel by pixel with the approved baseline (native\baseline).
 // node pixel_test.js          compare
 // node pixel_test.js --accept make the current picture the baseline (only after a person has looked at it)
-process.env.UNHOLIUM_MUTE = '1'; process.env.UNHOLIUM_DATA = 'D:/Unholium_native/tools/tmp/px'; process.env.W = '1256'; process.env.H = '628';
+process.env.UNHOLIUM_NOPAD = '1'; process.env.UNHOLIUM_MUTE = '1'; process.env.UNHOLIUM_DATA = 'D:/Unholium_native/tools/tmp/px'; process.env.W = '1256'; process.env.H = '628';
 const fs = require('fs'), path = require('path'), R = require('./runtime'), { Canvas, loadImage } = require('skia-canvas');
 fs.rmSync(process.env.UNHOLIUM_DATA, { recursive: true, force: true }); fs.mkdirSync(process.env.UNHOLIUM_DATA + '/storage', { recursive: true });
 const dir = path.join(__dirname, 'baseline'), accept = process.argv.includes('--accept'); fs.mkdirSync(dir, { recursive: true });

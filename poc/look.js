@@ -4,6 +4,7 @@ process.env.UNHOLIUM_MUTE = '1'; process.env.UNHOLIUM_DATA = 'D:/Unholium_native
 const fs = require('fs'), R = require('../native/runtime');
 fs.rmSync(process.env.UNHOLIUM_DATA, { recursive: true, force: true }); fs.mkdirSync(process.env.UNHOLIUM_DATA + '/storage', { recursive: true });
 process.on('uncaughtException', (e) => { console.log('UNCAUGHT', e.stack.slice(0, 900)); process.exit(1); });
+if (process.env.CANVLOG) { globalThis.__canvases = []; const ce = document.createElement; document.createElement = function (t) { const c = ce.call(this, t); if (t === 'canvas') { const l = new Error().stack.split(String.fromCharCode(10)).slice(2, 4).map((s) => s.trim().replace(/^at /, '').replace(/.*[\\/]/, '').replace(/\)$/, '')).join(' < '); globalThis.__canvases.push({ c, who: l }); } return c; }; }
 R.runFile('D:/Unholium_native/poc/seed.js'); R.loadGame({ beforeMain() {} });
 const ready = () => {
   if (!(G.realMat && G.realMat.ready)) { setTimeout(ready, 50); return; }

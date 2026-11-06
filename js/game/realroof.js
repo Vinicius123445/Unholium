@@ -74,10 +74,14 @@ TM.renderRoof = function (b) {
   else pitched(x, W, H, pick(set.pitched || (G.ROOF_COLORS[b.roof] || G.ROOF_COLORS.red).slice(0, 1), s), b);
   return c;
 };
+const ROOF_CLOCK = { t: 0 }, ROOF_BYTES = 90 * 1048576;
 TM.drawRoofs = function (ctx, view) {
   for (const b of this.buildings) {
     if (b.roofAlpha <= 0.01 || b.destroyed) continue;
+    // a roof is painted when it first comes into view, not all of them on the first frame of a map
+    const up = b.extraH != null ? b.extraH : (b.extraH = (this.floorsOf(b) - 1) * 48); if (b.x * 16 - 2 > view.x + view.w || (b.x + b.w) * 16 + 2 < view.x || b.y * 16 - 8 - up > view.y + view.h || (b.y + b.h) * 16 < view.y) continue;
     if (!b.roofCanvas) b.roofCanvas = this.renderRoof(b);
+    b._roofSeen = ROOF_CLOCK.t;
     const c = b.roofCanvas, k = c._rd || 1, w = c.width / k, rx = b.x * 16 - 2, ry = b.y * 16 - 8 - (b.extraH || 0), top = G.realFront.topOf(this, b), h = top == null ? c.height / k : Math.min(c.height / k, top - ry);   // (the roof stops where the front wall starts)
     if (h <= 0) continue;
     if (rx > view.x + view.w || ry > view.y + view.h || rx + w < view.x || ry + h < view.y) continue;
@@ -85,5 +89,10 @@ TM.drawRoofs = function (ctx, view) {
     ctx.drawImage(c, 0, 0, c.width, h * k, rx, ry, w, h);
   }
   ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
+  // they are the biggest images in the game, and any of them can be painted again exactly: past the budget, those out of sight longest go
+  if (++ROOF_CLOCK.t % 90 === 0) {
+    const kept = this.buildings.filter((b) => b.roofCanvas).sort((a, b) => (b._roofSeen || 0) - (a._roofSeen || 0)); let size = 0;
+    for (const b of kept) { size += b.roofCanvas.width * b.roofCanvas.height * 4; if (size > ROOF_BYTES && ROOF_CLOCK.t - (b._roofSeen || 0) > 120) b.roofCanvas = null; }
+  }
 };
 })();

@@ -154,6 +154,7 @@ js/game/animals2.js
 js/game/vehicleshd.js
 js/game/riders.js
 js/game/delirium2.js
+js/game/patchlayer.js
 js/game/firehd.js
 js/game/hdart.js
 js/game/furniturehd.js
@@ -275,5 +276,7 @@ js/game/bloodcare.js
 js/game/dialoguefix.js
 js/game/realwrecks.js
 js/game/sleepart.js
+js/game/physbody.js
+js/game/physview.js
 js/game/i18nhooks.js
 js/main.js
