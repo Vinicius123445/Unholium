@@ -15,7 +15,17 @@ if (process.env.UNHOLIUM_KEYLOG) { const L = [], log = (k) => { L.push(k); requi
 const keyOf = (e) => (e.key === 'Space' ? ' ' : e.key), codeOf = (e) => (/^Arrow/.test(e.key) ? e.key : e.code);   // (as the browser names them)
 w.on('keydown', (e) => { e.preventDefault(); fire(win, 'keydown', { code: codeOf(e), key: keyOf(e), repeat: e.repeat, ctrlKey: e.ctrlKey, altKey: e.altKey, shiftKey: e.shiftKey, metaKey: e.metaKey }); });
 w.on('keyup', (e) => fire(win, 'keyup', { code: codeOf(e), key: keyOf(e) }));
-const mouse = (t, e) => ({ clientX: e.x, clientY: e.y, button: e.button, buttons: e.buttons, type: t });
+// where the mouse is comes from Windows itself, scaled over the whole window: the library's own figure is worked out from its idea of
+// the canvas size, which goes stale when the window changes size, and the cursor then stopped short of the right edge
+const osMouse = () => {
+  try {
+    const U = api(), h = myWindow(); if (!h) return null;
+    const p = {}, r = {}; if (!U.cursor(p) || !U.toClient(h, p) || !U.client(h, r) || !(r.right > 0) || !(r.bottom > 0)) return null;
+    return { x: edge(p.x / r.right) * globalThis.innerWidth, y: edge(p.y / r.bottom) * globalThis.innerHeight };
+  } catch (e) { return null; }
+};
+const edge = (k) => Math.max(0, Math.min(1, k));
+const mouse = (t, e) => { const q = osMouse(); return { clientX: q ? q.x : e.x, clientY: q ? q.y : e.y, button: e.button, buttons: e.buttons, type: t }; };
 w.on('mousemove', (e) => fire(game, 'mousemove', mouse('mousemove', e)));
 w.on('mousedown', (e) => fire(game, 'mousedown', mouse('mousedown', e)));
 w.on('mouseup', (e) => fire(win, 'mouseup', mouse('mouseup', e)));
@@ -41,12 +51,18 @@ handlers.quit = leave;
 let wantFull = false, before = null, user32 = null, pending = false;
 const api = () => {
   if (user32) return user32;
-  const koffi = require('koffi'), u = koffi.load('user32.dll'), RECT = koffi.struct('UH_RECT', { left: 'int', top: 'int', right: 'int', bottom: 'int' }), INFO = koffi.struct('UH_MON', { size: 'uint32', mon: RECT, work: RECT, flags: 'uint32' }), f = (n, r, a) => u.func('__stdcall', n, r, a);
-  return (user32 = { find: f('FindWindowExW', 'void *', ['void *', 'void *', 'void *', 'str16']), pid: f('GetWindowThreadProcessId', 'uint32', ['void *', koffi.out(koffi.pointer('uint32'))]), rect: f('GetWindowRect', 'bool', ['void *', koffi.out(koffi.pointer(RECT))]), getStyle: f('GetWindowLongPtrW', 'int64', ['void *', 'int']), setStyle: f('SetWindowLongPtrW', 'int64', ['void *', 'int', 'int64']), place: f('SetWindowPos', 'bool', ['void *', 'void *', 'int', 'int', 'int', 'int', 'uint32']), monitor: f('MonitorFromWindow', 'void *', ['void *', 'uint32']), info: f('GetMonitorInfoW', 'bool', ['void *', koffi.inout(koffi.pointer(INFO))]) });
+  const koffi = require('koffi'), u = koffi.load('user32.dll'), RECT = koffi.struct('UH_RECT', { left: 'int', top: 'int', right: 'int', bottom: 'int' }), INFO = koffi.struct('UH_MON', { size: 'uint32', mon: RECT, work: RECT, flags: 'uint32' }), POINT = koffi.struct('UH_POINT', { x: 'int', y: 'int' }), f = (n, r, a) => u.func('__stdcall', n, r, a);
+  return (user32 = { find: f('FindWindowExW', 'void *', ['void *', 'void *', 'void *', 'str16']), pid: f('GetWindowThreadProcessId', 'uint32', ['void *', koffi.out(koffi.pointer('uint32'))]), rect: f('GetWindowRect', 'bool', ['void *', koffi.out(koffi.pointer(RECT))]), getStyle: f('GetWindowLongPtrW', 'int64', ['void *', 'int']), setStyle: f('SetWindowLongPtrW', 'int64', ['void *', 'int', 'int64']), place: f('SetWindowPos', 'bool', ['void *', 'void *', 'int', 'int', 'int', 'int', 'uint32']), monitor: f('MonitorFromWindow', 'void *', ['void *', 'uint32']), info: f('GetMonitorInfoW', 'bool', ['void *', koffi.inout(koffi.pointer(INFO))]), cursor: f('GetCursorPos', 'bool', [koffi.out(koffi.pointer(POINT))]), toClient: f('ScreenToClient', 'bool', ['void *', koffi.inout(koffi.pointer(POINT))]), client: f('GetClientRect', 'bool', ['void *', koffi.out(koffi.pointer(RECT))]) });
 };
-const applyFull = () => {
+let hwnd = null;
+const myWindow = () => {
+  if (hwnd) return hwnd;
   const U = api(), pid = [0]; let h = null;
   do { h = U.find(null, h, null, 'Unholium'); if (h) U.pid(h, pid); } while (h && pid[0] !== process.pid);
+  return (hwnd = h);
+};
+const applyFull = () => {
+  const U = api(), h = myWindow();
   if (!h) return false;
   if (wantFull && !before) {
     const r = {}, style = U.getStyle(h, -16), m = { size: 40, mon: {}, work: {}, flags: 0 }; U.rect(h, r); before = { style, r };

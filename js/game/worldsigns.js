@@ -150,5 +150,4 @@ if (VM) { VM.moto_chopper = { body: '#141418', moto: true, len: 34, wid: 11, max
 const _ind2 = G.MAPGEN.industrial;
 G.MAPGEN.industrial = () => { const m = _ind2(), b = m.building('i_cannery'); if (b && G.DECOR.moto_chopper) for (const dx of [-4, -6, 5, 7]) { const x = b.doorX + dx, y = b.doorY + 2; if (m.inBounds(x, y) && !m.isSolidTile(x, y) && !m.decorsAt(x, y).length) m.addDecor('moto_chopper', x, y); } return m; };
 const VD = G.Vehicle && G.Vehicle.prototype;
-if (VD) { const _vd = VD.draw; VD.draw = function (ctx) { const r = _vd.apply(this, arguments); if (this.model === 'moto_chopper') { ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle || 0); ctx.fillStyle = '#c8ccd2'; ctx.fillRect(10, -7, 1, 14); ctx.fillRect(8, -7, 3, 1); ctx.fillRect(8, 6, 3, 1); ctx.fillStyle = '#a02020'; ctx.fillRect(-2, -2.4, 7, 4.8); ctx.fillStyle = '#e8e4d0'; ctx.fillRect(0.4, -0.8, 2, 1.6); ctx.restore(); } return r; }; }
 })();

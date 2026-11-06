@@ -86,6 +86,8 @@ class Vehicle {
     Object.assign(this, { kind: 'vehicle', dead: false, angle: 0, speed: 0, steer: 0, ai: null, rec: null, hurtT: 0 }, o);
     this.m = MODELS[this.model] || MODELS.car_gray;
     this.hp = this.hp != null ? this.hp : this.m.hp;
+    if (this.burnt) { this.exploded = true; this.wrecked = true; this.hp = 0; this.speed = 0; }   // (what burnt stays burnt, across maps and saves: js/game/explosions.js)
+    if (this.fallen && this.fallT == null) this.fallT = 1;
   }
   distTo(o) { return Math.hypot(o.x - this.x, o.y - this.y); }
   get L() { return this.m.len / 2; }

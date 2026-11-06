@@ -110,41 +110,8 @@ GS.loadMap = function () {
   }
   return r;
 };
-// ---------------------------------------------------------------- motorcycles and bicycles, from above
+// ---------------------------------------------------------------- bicycles from above (motorcycles: js/game/realwrecks.js)
 const D = 4, _get = G.vehiclesHD.get, cache = {};
-function moto(m) {
-  const L = m.len, W = m.wid, c = document.createElement('canvas'); c.width = L * D; c.height = W * D;
-  const x = c.getContext('2d'); x.scale(D, D); const my = W / 2, b = m.body, chop = !!m.chopper, RR = (X, Y, w, h, r, f) => fill(x, X, Y, w, h, r, f);
-  const across = (Y, H, col) => { const g = x.createLinearGradient(0, Y, 0, Y + H); g.addColorStop(0, sh(col, 0.55)); g.addColorStop(0.34, sh(col, 1.3)); g.addColorStop(0.5, sh(col, 1.55)); g.addColorStop(0.68, col); g.addColorStop(1, sh(col, 0.42)); return g; };
-  const tyre = (X, l, w) => { RR(X, my - w / 2, l, w, 0.5, across(my - w / 2, w, '#26262a')); x.fillStyle = 'rgba(0,0,0,0.5)'; for (let i = X + 0.6; i < X + l - 0.4; i += 1) x.fillRect(i, my - w / 2 + 0.25, 0.3, w - 0.5); x.fillStyle = 'rgba(255,255,255,0.1)'; x.fillRect(X + 0.6, my - 0.15, l - 1.2, 0.3); };
-  const fx = L - (chop ? 2 : 3);   // the nose
-  tyre(0.4, L * 0.26, chop ? 4.4 : 3.8); tyre(L - L * 0.25 - 0.4, L * 0.25, chop ? 2.6 : 3.2);
-  RR(L * 0.04, my - 1.9, L * 0.2, 3.8, 0.8, across(my - 1.9, 3.8, b));   // rear hugger
-  RR(L * 0.76, my - 1.7, L * 0.2, 3.4, 0.8, across(my - 1.7, 3.4, b));   // front fender
-  // the swingarm and the engine under it all
-  RR(L * 0.2, my - 2.5, L * 0.2, 0.7, 0.2, '#52545c'); RR(L * 0.2, my + 1.8, L * 0.2, 0.7, 0.2, '#52545c');
-  RR(L * 0.34, my - 4.2, L * 0.26, 8.4, 1, across(my - 4.2, 8.4, '#3a3a42'));
-  x.fillStyle = 'rgba(0,0,0,0.42)'; for (let i = L * 0.36; i < L * 0.58; i += 1.1) x.fillRect(i, my - 4, 0.3, 8);
-  ell(x, L * 0.46, my - 4, 1.8, 1, '#8a8e96'); ell(x, L * 0.46, my + 4, 1.8, 1, '#8a8e96');   // side covers
-  // the exhaust down the right
-  const ex = my + (chop ? 4.2 : 3.6); RR(L * 0.04, ex, L * 0.4, 1.7, 0.7, across(ex, 1.7, '#c8ccd2')); ell(x, L * 0.05, ex + 0.85, 0.5, 0.75, '#141416'); if (chop) RR(L * 0.04, my - 5.9, L * 0.4, 1.7, 0.7, across(my - 5.9, 1.7, '#c8ccd2'));
-  // the seat and its tail
-  RR(L * 0.16, my - 2.5, L * 0.32, 5, 1.1, across(my - 2.5, 5, '#242226')); x.fillStyle = 'rgba(255,255,255,0.05)'; for (let i = L * 0.18; i < L * 0.46; i += 2) x.fillRect(i, my - 2, 0.3, 4);
-  if (!chop) { RR(L * 0.08, my - 2.2, L * 0.13, 4.4, 1, across(my - 2.2, 4.4, b)); fill(x, L * 0.06, my - 1.2, 1, 2.4, 0.3, '#e02a2a'); }
-  else { RR(L * 0.1, my - 3, L * 0.09, 6, 1, across(my - 3, 6, '#242226')); }   // a sissy pad
-  // the tank: glossy, the widest thing on the bike, a stripe down it
-  x.fillStyle = across(my - 3.6, 7.2, b); x.beginPath(); x.moveTo(L * 0.46, my - 2.4); x.quadraticCurveTo(L * 0.54, my - 4, L * 0.66, my - 3.2); x.quadraticCurveTo(L * 0.71, my, L * 0.66, my + 3.2); x.quadraticCurveTo(L * 0.54, my + 4, L * 0.46, my + 2.4); x.closePath(); x.fill();
-  x.fillStyle = 'rgba(255,255,255,0.68)'; x.fillRect(L * 0.47, my - 0.42, L * 0.2, 0.84); x.fillStyle = sh(b, 0.6); x.fillRect(L * 0.47, my - 0.1, L * 0.2, 0.2);
-  ell(x, L * 0.53, my - 2, 2.4, 0.6, 'rgba(255,255,255,0.42)'); ell(x, L * 0.62, my, 0.6, 0.6, '#c8ccd4');
-  // fork, bars, levers, mirrors, clocks
-  const barX = L * (chop ? 0.67 : 0.72), bw = W / 2 - 0.5;
-  for (const s of [-1, 1]) { RR(L * 0.7, my + s * 1.5 - 0.35, L * 0.2, 0.7, 0.15, '#d0d4dc'); }
-  line(x, '#b8bcc4', 0.75, barX + 0.8, my, barX, my - bw); line(x, '#b8bcc4', 0.75, barX + 0.8, my, barX, my + bw);
-  for (const s of [-1, 1]) { const Y = my + s * bw; fill(x, barX - 0.7, Y - 1.1, 1.4, 2.2, 0.4, '#141416'); line(x, '#7a7e86', 0.3, barX + 0.8, Y - s * 0.2, barX + 1.5, Y - s * 2); line(x, '#2a2a30', 0.3, barX + 0.2, my + s * (bw - 3), barX - 1.6, my + s * (bw - 1.5)); ell(x, barX - 1.8, my + s * (bw - 1.2), 0.9, 0.7, '#1e1e24'); ell(x, barX - 1.85, my + s * (bw - 1.2), 0.5, 0.4, '#b8d4e4'); }
-  if (!chop) { RR(L * 0.78, my - 2.2, L * 0.11, 4.4, 0.7, across(my - 2.2, 4.4, b)); RR(L * 0.77, my - 1.9, 1.2, 3.8, 0.4, 'rgba(160,200,220,0.7)'); }
-  ell(x, fx - 0.4, my, 1.4, 1.9, '#d8dce4'); ell(x, fx - 0.2, my, 1, 1.5, '#fff6d0');
-  return c;
-}
 function bicycle(m) {
   const L = m.len, W = m.wid, c = document.createElement('canvas'); c.width = L * D; c.height = W * D;
   const x = c.getContext('2d'); x.scale(D, D); const my = W / 2, b = m.body, wheel = L * 0.34;
@@ -160,6 +127,6 @@ function bicycle(m) {
 }
 G.vehiclesHD.get = function (model) {
   const m = G.vehicles.MODELS[model]; if (!m || !(m.moto || m.bike)) return _get.call(this, model);
-  return cache[model] || (cache[model] = m.bike ? bicycle(m) : moto(m));
+  return cache[model] || (cache[model] = m.bike ? bicycle(m) : G.vehicleArt.top(Object.assign({ id: model }, m)));
 };
 })();

@@ -5,7 +5,7 @@ const G = (window.G = window.G || {});
 
 G.config = {
   TITLE: 'Unholium',
-  VERSION: '0.30',
+  VERSION: '0.31',
   TILE: 16,
   VIEW_H: 240,          // world pixels visible vertically (zoom derives from this)
   UI_H: 360,            // virtual UI height; UI is laid out in these units

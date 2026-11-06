@@ -38,6 +38,9 @@ const DesktopTransport = {
   },
   host(port) { G.platform.post('net:host:' + port); },
   join(ip, port) { G.platform.post('net:join:' + ip + ':' + port); },
+  find() { G.platform.post('net:find'); },
+  findStop() { G.platform.post('net:findstop'); },
+  info(o) { G.platform.post('net:hostinfo:' + JSON.stringify(o)); },
   send(obj) { G.platform.post('net:send:' + JSON.stringify(obj)); },
   sendTo(id, obj) { G.platform.post('net:sendto:' + id + ':' + JSON.stringify(obj)); },
   kick(id) { G.platform.post('net:kick:' + id); },
@@ -61,9 +64,19 @@ const C = G.coop = {
   host(port = PORT, transport) {
     this.net = transport || DesktopTransport; this.role = 'host'; this.peers = {}; this.port = port;
     this.net.open(this.handler());
-    this.net.host(port);
+    this.net.host(port); this.announce();
     this.say('Hosting on port ' + port + '. Friends join with your IP address (LAN, or port forwarding / Tailscale / ZeroTier).');
   },
+  // what a host shows in other people's Find games list
+  announce() { const g = gameScene(); if (this.net.info) this.net.info({ name: (g && g.player && g.player.playerName) || this.hostName || 'Host', players: this.count(), v: VERSION }); },
+  find() { this.net = DesktopTransport; this.games = {}; this.net.open(this.handler()); this.net.find(); },
+  findStop() { if (this.net.findStop) this.net.findStop(); },
+  onFound(s) {
+    let d = null; try { d = JSON.parse(s); } catch (e) { return; } if (!d || !d.ip) return;
+    const k = d.id || d.ip + ':' + d.port, o = this.games[k];   // (one host on two networks is one game: the first answer's address)
+    this.games[k] = Object.assign(d, { ip: o ? o.ip : d.ip, port: o ? o.port : d.port, t: performance.now() });
+  },
+  list() { const now = performance.now(); return Object.values(this.games || {}).filter((g) => now - g.t < 5000).sort((a, b) => a.name.localeCompare(b.name)); },
   stop() {
     if (this.role === 'guest') this.saveChar();
     const g = gameScene();
@@ -73,10 +86,10 @@ const C = G.coop = {
   },
   handler() {
     return {
-      join: (id) => { this.peers[id] = { id, joined: false, last: performance.now() }; },
-      leave: (id) => this.dropPeer(id, 'left the game'),
+      join: (id) => { this.peers[id] = { id, joined: false, last: performance.now() }; this.announce(); },
+      leave: (id) => { this.dropPeer(id, 'left the game'); this.announce(); },
       msg: (id, s) => { const m = safe(s); if (m) try { this.role === 'host' ? this.onHostMsg(id, m) : this.onGuestMsg(m); } catch (e) { G.reportError && G.reportError(e); } },
-      hosting: () => {}, ip: (s) => { this.ips = String(s).split(',').filter(Boolean); },
+      found: (s) => this.onFound(s), hosting: () => this.announce(), ip: (s) => { this.ips = String(s).split(',').filter(Boolean); },
       connected: () => this.sendHello(), error: (t) => this.netError(t), closed: () => this.netError('Connection closed.'),
     };
   },
@@ -421,9 +434,10 @@ class CoopMenu {
         if (!saves.length) { G.scenes.push(new G.MessageScene('You need a saved game to host: start one in single player first.', 'Co-op')); return; }
         G.scenes.push(new G.ChoiceScene('Host: pick a save', 'Your save is the world your friends join.', saves.map((s) => ({ label: `${G.saves.label(s)} · ${(G.saves.meta(s) || {}).mapName || ''} · Day ${(G.saves.meta(s) || {}).day || '?'}`, fn: () => { G.scenes.replace(new G.GameScene({ save: G.saves.read(s) })); C.host(PORT); } }))));
       } },
-      { label: 'Join a game', act: () => G.scenes.push(new IpScene()) },
+      { label: 'Find games', act: () => G.scenes.push(new FindScene()) },
+      { label: 'Join by address', act: () => G.scenes.push(new IpScene()) },
       { label: `Friendly fire: ${C.friendlyFire ? 'On' : 'Off'} (host)`, act: () => { C.friendlyFire = !C.friendlyFire; } },
-      { label: 'How do friends connect?', act: () => G.scenes.push(new G.MessageScene('On the same network: the host\'s local IP (shown on screen while hosting), port 7777.\nOver the internet: the host forwards TCP port 7777 on their router, or everyone joins the same Tailscale / ZeroTier network and uses that IP.\nEveryone needs the same game version.', 'Co-op')) },
+      { label: 'How do friends connect?', act: () => G.scenes.push(new G.MessageScene('On the same network: the host\'s local IP (shown on screen while hosting), port 7777. Find games lists them by itself. The host must allow TCP port 7777 and UDP port 7778 in Windows Firewall.\nOver the internet: the host forwards TCP port 7777 on their router, or everyone joins the same Tailscale / ZeroTier network and uses that IP.\nEveryone needs the same game version.', 'Co-op')) },
       { label: 'Back', act: () => G.scenes.remove(this) },
     ];
   }
@@ -437,6 +451,34 @@ class CoopMenu {
     if (i >= 0) o[i].act();
   }
 }
+const pickChar = (ip, port) => G.scenes.push(new G.ChoiceScene('Join with which character?', 'Only the character comes along: look, skills, things, money.', C.chars().map((c) => ({ label: c.label, fn: () => C.join(ip, port, c.char) }))
+  .concat([{ label: 'Create a new character', fn: () => { G.coopCreate = { ip, port }; G.scenes.replace(new G.CharacterCreatorScene()); } }])));
+// games on your network, found by themselves: pick one and go
+class FindScene {
+  constructor() { this.transparent = true; this.sel = 0; C.find(); }
+  close() { C.findStop(); G.scenes.remove(this); }
+  go(g) {
+    if (g.v !== VERSION) { G.scenes.push(new G.MessageScene(`That game is on another version (host ${g.v}, you ${VERSION}).`, 'Co-op')); return; }
+    C.findStop(); G.scenes.remove(this); G.store.set('rpgbase_coop_lastip', g.ip); pickChar(g.ip, g.port);
+  }
+  update() {
+    const l = C.list(), I = G.input, r = G.ui.nav(this, 'sel', Math.max(1, l.length));
+    if (I.pressed.has('Escape') || r === 'cancel') { I.pressed.delete('Escape'); this.close(); return; }
+    this.sel = Math.min(this.sel, Math.max(0, l.length - 1));
+    if (r === 'confirm' && l[this.sel]) this.go(l[this.sel]);
+  }
+  render(ctx) {
+    const U = G.ui, R = G.renderer, l = C.list(), rows = Math.max(3, Math.min(6, l.length)), w = 320, h = 44 + rows * 17, x = (R.uiW - w) / 2, y = (R.uiH - h) / 2, m = G.input.mouse;
+    U.dim(ctx, 0.5); U.panel(ctx, x, y, w, h, { title: 'Find games', titleSize: 12 });
+    if (!l.length) U.text(ctx, `Searching your network${'.'.repeat(1 + Math.floor(G.loop.time * 2) % 3)}`, x + 14, y + 34, { size: 9, color: U.colors.dim });
+    l.slice(0, 6).forEach((g, i) => {
+      const b = U.button(ctx, x + 10, y + 26 + i * 17, w - 20, 15, `${g.name || 'Host'}  ·  ${g.players}/4${g.v !== VERSION ? '  ·  other version' : ''}`, { selected: this.sel === i });
+      if (b.hover && m.moved) this.sel = i;
+      if (b.clicked) { m.pressed = false; this.go(g); }
+    });
+    U.text(ctx, 'Esc to go back', x + w - 12, y + h - 12, { size: 7, align: 'right', color: U.colors.dim });
+  }
+}
 class IpScene {
   constructor() { this.transparent = true; this.text = G.store.get('rpgbase_coop_lastip', '') || ''; G.input.typed.length = 0; }
   update() {
@@ -447,10 +489,7 @@ class IpScene {
     if (I.pressed.has('Enter') && this.text) {
       G.store.set('rpgbase_coop_lastip', this.text);
       const [ip, port] = this.text.includes(':') ? this.text.split(':') : [this.text, PORT];
-      const chars = C.chars();
-      G.scenes.remove(this);
-      G.scenes.push(new G.ChoiceScene('Join with which character?', 'Only the character comes along: look, skills, things, money.', chars.map((c) => ({ label: c.label, fn: () => C.join(ip, +port || PORT, c.char) }))
-        .concat([{ label: 'Create a new character', fn: () => { G.coopCreate = { ip, port: +port || PORT }; G.scenes.replace(new G.CharacterCreatorScene()); } }])));
+      G.scenes.remove(this); pickChar(ip, +port || PORT);
     }
   }
   render(ctx) {
@@ -485,3 +524,7 @@ CCP.act = function (key) {
 };
 G.coop.Loopback = Loopback;
 })();
+
+Object.assign(G.LANG_PT.s, { 'Find games': 'Procurar jogos', 'Join by address': 'Entrar por endereço', 'Esc to go back': 'Esc para voltar' });
+G.LANG_PT.t.push(['Searching your network{0}', 'Procurando na sua rede{0}'], ['That game is on another version (host {0}, you {1}).', 'Esse jogo está em outra versão (anfitrião {0}, você {1}).'], ['{0}  ·  {1}/4  ·  other version', '{0}  ·  {1}/4  ·  outra versão']);
+G.LANG_PT.t.push(['Could not reach {0}. Check the address, and that the host is hosting and allowed port {1} in their firewall.', 'Não foi possível alcançar {0}. Confira o endereço, se o anfitrião está hospedando e se liberou a porta {1} no firewall.'], ['{0} answered, but nobody is hosting on port {1}.', '{0} respondeu, mas ninguém está hospedando na porta {1}.'], ['There is no address called {0}.', 'Não existe um endereço chamado {0}.']); if (G.i18n.tpl) G.i18n.tpl = null;

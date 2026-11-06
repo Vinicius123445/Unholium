@@ -56,7 +56,11 @@ G.explosions = {
     v.exploded = true; v.wrecked = true; v.speed = 0; v.burning = 0; v.hp = 0; v.burnt = true;
     if (v.driver === 'player') G.vehicles.exit(scene, true);
     if (v.ai && v.ai.driver) { v.ai.driver = null; }
-    if (v.rec) Object.assign(v.rec, { wrecked: true, burnt: true, hp: 0 });
+    v.ai = null;
+    if (v.m.moto && !v.fallen) { v.fallen = true; v.fallT = 1; v.fallSide = Math.random() < 0.5 ? -1 : 1; }   // nothing holds a burnt bike up
+    // traffic has no record of its own and would be gone with the map: a wreck stays where it burnt
+    const w = scene.world; if (!v.rec) { v.rec = { id: 'wreck_' + G.util.uid(), model: v.model }; G.vehicles.records(w).push(v.rec); }
+    Object.assign(v.rec, { map: scene.map.id, x: v.x, y: v.y, angle: v.angle, wrecked: true, burnt: true, hp: 0, fallen: !!v.fallen, fallSide: v.fallSide });
     this.blast(scene, v.x, v.y, v.m.moto ? 44 : 60, v.m.moto ? 55 : 75, !!v.burnByPlayer);
   },
   update(scene, dt) {
@@ -97,13 +101,6 @@ F.hitActor = function (scene, b) {
   return _hit.call(this, scene, b);
 };
 F.draw = function (ctx, scene) { _draw.call(this, ctx, scene); G.explosions.draw(ctx, scene); };
-// burnt-out wrecks are drawn black
-const V = G.Vehicle.prototype, _vdraw = V.draw;
-V.draw = function (ctx) {
-  if (!this.burnt) return _vdraw.call(this, ctx);
-  ctx.save(); ctx.filter = 'brightness(0.25) saturate(0.2)'; _vdraw.call(this, ctx); ctx.restore();
-  if (this.burning || Math.random() < 0.02) { ctx.fillStyle = 'rgba(70,70,70,0.4)'; ctx.beginPath(); ctx.arc(this.x, this.y - 6 - (G.loop.time * 20) % 20, 3, 0, Math.PI * 2); ctx.fill(); }
-};
 const GS = G.GameScene.prototype, _gu = GS.update;
 GS.update = function (dt) { const r = _gu.call(this, dt); if (this.map && this.fire) G.explosions.update(this, dt); return r; };
 })();

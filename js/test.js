@@ -2636,6 +2636,41 @@
 
   // 2026-10-31: law (bodies, cases, wanted), My Jobs, notifications, economy and the small fixes
   // the small things, each once wrong
+  function vehicleWrecks() {
+    const g = game(), p = g.player, w = g.world, E = G.explosions, A = G.vehicleArt; G.scenes.replace(g); g.loadMap('city', 'start'); tick(20);
+    const here = g.map.id, blasts = []; const bl = E.blast; E.blast = function () { blasts.push(1); };
+    // traffic burns: it has no record of its own, and still has to be there when you come back
+    const car = new G.Vehicle({ model: 'car_gray', x: p.x + 200, y: p.y, angle: 0.3 }), bike = new G.Vehicle({ model: 'moto_red', x: p.x + 260, y: p.y, angle: 0 }); car.ai = { road: null }; bike.ai = {}; g.vehicles.push(car, bike);
+    E.explodeVehicle(g, car); E.explodeVehicle(g, bike); check(blasts.length === 2, 'they blow up once each');
+    check(car.rec && car.rec.burnt && car.rec.map === here, 'a burnt car is written down'); check(!car.ai, 'nobody drives it'); check(bike.fallen, 'a burnt bike lies down');
+    check(G.vehicleArt.wreckOf('car_gray', 0) && A.sideOf(Object.assign({ id: 'moto_red' }, G.vehicles.MODELS.moto_red), true), 'the wreck models exist'); G.loop.draw();
+    let drawn = 0; const dw = A.drawWreck; A.drawWreck = function () { drawn++; return dw.apply(this, arguments); }; car.draw(G.renderer.ctx); bike.draw(G.renderer.ctx); A.drawWreck = dw; check(drawn === 2, 'a burnt vehicle is always drawn as the wreck');
+    const cx = car.x, cy = car.y; g.loadMap('rural', 'start'); tick(5); g.loadMap(here, 'start'); tick(5);
+    const back = g.vehicles.find((v) => v.burnt && Math.hypot(v.x - cx, v.y - cy) < 1); check(back && back.model === 'car_gray', 'it is there after leaving the map and coming back'); check(back && back.exploded && back.wrecked && back.hp === 0, 'and still destroyed');
+    // a save and a load
+    const saved = JSON.parse(JSON.stringify(G.vehicles.records(w).filter((r) => r.burnt))); check(saved.length >= 2, 'wrecks go into the save');
+    const again = saved.map((rec) => new G.Vehicle(Object.assign({}, rec, { rec }))), n = blasts.length; g.vehicles.push(...again); tick(90); check(blasts.length === n, 'a loaded wreck does not blow up again');
+    check(again.every((v) => v.burnt && v.wrecked && v.hp === 0), 'nor comes back to life'); const m0 = again.find((v) => v.m.moto); check(m0 && m0.fallen && m0.fallT === 1, 'a burnt bike is still on the ground after a load');
+    check(again[0].rec.burnt, 'its record stays burnt'); G.vehicles.enter(g, again.find((v) => !v.m.moto) || again[0]); check(!p.vehicle || !p.vehicle.burnt, 'nobody gets in a burnt car'); if (p.vehicle) G.vehicles.exit(g);
+    E.blast = bl;
+    // motorcycles
+    const ids = ['moto_red', 'moto_black', 'moto_blue', 'moto_chopper']; check(new Set(ids.map((id) => A.typeOf(Object.assign({ id }, G.vehicles.MODELS[id])))).size === 4, 'four different kinds of motorcycle');
+    const s = A.sideOf(Object.assign({ id: 'moto_red' }, G.vehicles.MODELS.moto_red), false), v = new G.Vehicle({ model: 'moto_red', x: p.x, y: p.y, angle: 0 }); v.fallen = true; v.fallT = 1; v.fallSide = 1; let side = 0; const dl = A.drawLying; A.drawLying = function () { side++; return dl.apply(this, arguments); }; v.draw(G.renderer.ctx); A.drawLying = dl; check(side === 1 && s.c.width > 200, 'a fallen bike is its own model, not a rotated one');
+    const b2 = new G.Vehicle({ model: 'bike_red', x: p.x, y: p.y, angle: 0 }); b2.fallen = true; b2.fallT = 1; b2.draw(G.renderer.ctx); check(true, 'a bicycle still draws');
+    const rec = { id: 't', model: 'moto_black', map: here, x: p.x, y: p.y, angle: 0, hp: 50 }, own = new G.Vehicle(Object.assign({}, rec, { rec })); G.crashes.topple(g, own, [0, 0], 20); check(rec.fallen, 'a bike left lying is remembered'); check(new G.Vehicle(Object.assign({}, rec, { rec })).fallT === 1, 'and comes back lying');
+    w.vehicles = G.vehicles.records(w).filter((r) => !r.burnt); G.scenes.remove(g);
+  }
+  function coopFind() {
+    const C = G.coop, sent = [], post = G.platform.post, was = C.net; G.platform.post = (m) => { sent.push(m); };
+    G.scenes.replace(new G.MenuScene()); const M = new G.CoopMenu(); G.scenes.push(M); const o = M.options(), f = o.find((q) => q.label === 'Find games'); check(f && o.some((q) => q.label === 'Join by address'), 'the menu has Find games and the address way');
+    f.act(); const S = G.scenes.top(); check(sent.includes('net:find'), 'searching asks the network'); tick(2); check(G.scenes.top() === S, 'an empty list is fine');
+    const v = C.VERSION; C.onFound(JSON.stringify({ ip: '192.168.1.9', port: 7777, id: 5, name: 'Ana', players: 2, v })); C.onFound(JSON.stringify({ ip: '25.1.2.3', port: 7777, id: 5, name: 'Ana', players: 2, v })); C.onFound('not json'); C.onFound(JSON.stringify({ port: 1 }));
+    check(C.list().length === 1 && C.list()[0].ip === '192.168.1.9', 'one host on two networks is one row; junk is ignored'); tick(2);
+    C.onFound(JSON.stringify({ ip: '192.168.1.8', port: 7777, id: 6, name: 'Old', players: 1, v: '1999' })); S.go(C.list().find((g) => g.name === 'Old')); check(G.scenes.top() instanceof G.MessageScene, 'another version says so'); G.scenes.remove(G.scenes.top());
+    S.go(C.list().find((g) => g.name === 'Ana')); check(sent.includes('net:findstop'), 'picking a game stops the search'); check(G.scenes.top() instanceof G.ChoiceScene, 'and goes on to the character choice'); G.scenes.remove(G.scenes.top());
+    G.scenes.remove(M); const T = new (S.constructor)(); G.scenes.push(T); sent.length = 0; G.input.pressed.add('Escape'); G.loop.tick(1 / 60); check(!G.scenes.stack.includes(T) && sent.includes('net:findstop'), 'Esc leaves and stops the search');
+    G.platform.post = post; C.net = was; G.input.pressed.delete('Escape');
+  }
   function bloodFixes() {
     const g = game(), p = g.player, w = g.world, BC = G.bloodCare; G.scenes.replace(g); g.loadMap('city', 'start'); tick(20); G.settings.data.gore = true;
     const list = G.gore.list(g), add = (x, y, o = {}) => { const d = Object.assign({ x, y, type: 'splat', r: 5 }, o); G.gore.add(g, d); return d; };
@@ -6148,7 +6183,7 @@
         try {
           G.law.off = true; G.bleed.playerOff = true; G.settings.data.legacyControls = false; G.settings.data.moveMode = 1; G.happenings.off = true; G.travel.off = true;
           if (only !== 'suiteHead') { G.scenes.replace(new G.GameScene({})); tick(3); }
-          const groups = { bloodFixes, talkFixes, playFixes, smallFixes, padPlay, demandFight, edgesCars, quality, audioScore, audit2, fireStarting, emergency, laterFixes, lawAndOrder, uiWindows, quickload, aiDialogue, eagleMaps, trading, companionMood, aiJobs, aiFollow, npcLife, welcome, awareness, npcTalk, aiUpdate, liveAI, language, prisonPatch, fightClub, clubBuilding, venues, estate, cityFinish, textures, grit, snap, audit, lineup, signs, wetClothes, itemIcons, iconSheet, uiWorn, playthrough, interiors, treeRoofs, seating };
+          const groups = { vehicleWrecks, coopFind, bloodFixes, talkFixes, playFixes, smallFixes, padPlay, demandFight, edgesCars, quality, audioScore, audit2, fireStarting, emergency, laterFixes, lawAndOrder, uiWindows, quickload, aiDialogue, eagleMaps, trading, companionMood, aiJobs, aiFollow, npcLife, welcome, awareness, npcTalk, aiUpdate, liveAI, language, prisonPatch, fightClub, clubBuilding, venues, estate, cityFinish, textures, grit, snap, audit, lineup, signs, wetClothes, itemIcons, iconSheet, uiWorn, playthrough, interiors, treeRoofs, seating };
           // the parts of the long suite, one at a time, under the same conditions it sets up
           Object.assign(groups, { suiteHead: () => { window.__headOnly = true; return suite(); }, newFeatures, skillsAndItems, lifeSystems, worldSystems, dailyLife, loveLife, homeLife, streetLife, polish, cityLife, batch3, crashes, knockouts, aid, realism, gunmen, brainLevels });
           if (only.startsWith('seq:')) { G.economy.mugOff = true; G.settings.data.notifications = 2; G.rest.DRAIN = 0; G.WITNESS_DELAY = 0; G.streetlife.off = true; G.behavior.spaceOff = true; G.walkWatchdogOff = true; G.law.off = true; }

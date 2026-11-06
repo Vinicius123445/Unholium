@@ -273,6 +273,7 @@ js/game/groundloot.js
 js/game/npcinv.js
 js/game/bloodcare.js
 js/game/dialoguefix.js
+js/game/realwrecks.js
 js/game/sleepart.js
 js/game/i18nhooks.js
 js/main.js

@@ -190,6 +190,7 @@ const C = G.crashes = {
     v.crash = { vx, vy, spin: (Math.random() < 0.5 ? -1 : 1) * (2 + impact / 60), t: 0 };
     v.fallen = true; v.fallT = 0; v.fallSide = Math.random() < 0.5 ? -1 : 1;
     v.ai = null; v.speed = 0; v.wobble = null;
+    if (v.rec) Object.assign(v.rec, { fallen: true, fallSide: v.fallSide, angle: v.angle, x: v.x, y: v.y });
   },
   stepVehicle(v, dt, scene) {
     const c = v.crash, map = scene.map;
@@ -357,7 +358,7 @@ VP.draw = function (ctx) {
 
 // picking a fallen bike back up
 const _enter = V.enter;
-V.enter = function (scene, v) { if (v.fallen) { v.fallen = false; v.crash = null; v.fallT = null; } return _enter.apply(this, arguments); };
+V.enter = function (scene, v) { if (v.burnt) { scene.toast('It is totaled.'); return undefined; } if (v.wrecked) return _enter.apply(this, arguments); if (v.fallen) { v.fallen = false; v.crash = null; v.fallT = null; if (v.rec) v.rec.fallen = false; } return _enter.apply(this, arguments); };
 
 const _gu = GS.update;
 GS.update = function (dt) {
