@@ -1,0 +1,1 @@
+{"name":"unholium-native","private":true,"version":"0.1.0","dependencies":{"classic-level":"^3.0.0","koffi":"^3.3.7","node-web-audio-api":"^2.2.0","rcedit":"^5.0.2","skia-canvas":"^4.0.0"}}

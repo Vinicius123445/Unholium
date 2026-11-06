@@ -1,0 +1,4 @@
+const { importSaves } = require('./migrate'), path = require('path'), fs = require('fs'), crypto = require('crypto');
+const src = 'D:/Game_backups/Game_2026-11-05_before_native/AppData_Unholium/EBWebView/Default/Local Storage/leveldb', d = 'D:/Unholium_native/tools/tmp/mig';
+const sum = () => fs.readdirSync(src).sort().map((f) => f + crypto.createHash('sha1').update(fs.readFileSync(path.join(src, f))).digest('hex')).join();
+(async () => { fs.rmSync(d, { recursive: true, force: true }); fs.mkdirSync(d, { recursive: true }); const a = sum(); const r = await importSaves(src, d); console.log('imported', r.imported, r.why || '', 'original unchanged', a === sum()); for (const k of r.keys || []) { const f = path.join(d, 'storage', encodeURIComponent(k) + '.json'), t = fs.readFileSync(f, 'utf8'); let ok = true; try { JSON.parse(t); } catch (e) { ok = false; } console.log(' ', k.slice(0, 40), t.length, ok ? 'json' : 'NOT JSON'); } })().catch((e) => console.log(e.stack));

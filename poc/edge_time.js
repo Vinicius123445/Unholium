@@ -1,0 +1,1 @@
+window.addEventListener('load', () => { const pre = document.createElement('pre'); pre.id = 'res'; try { PocTiming(0, (o) => { pre.textContent = JSON.stringify(o); }); } catch (e) { pre.textContent = String(e.stack); } document.body.appendChild(pre); });

@@ -1,0 +1,25 @@
+# built game, and everything that can be downloaded or made again
+dist/
+native/node_modules/
+poc/node_modules/
+tools/node/
+tools/npm-cache/
+tools/tmp/
+tools/from_C_temp/
+
+# saves, settings and keys of whoever runs from source
+/data/
+*.log
+
+# test output and one-off scripts
+poc/out/
+native/full*.txt
+native/shot.png
+native/crop.png
+native/tool_shot.png
+native/baseline/*_now.png
+native/baseline/*_diff.png
+tools/_*
+
+# Office lock files
+~$*

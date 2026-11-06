@@ -1,0 +1,11 @@
+Restore the game's on-screen mouse cursor/arrow, which was previously visible but is now missing.
+
+Finish all remaining unfinished work across the entire project. Continue implementing and polishing everything that is still incomplete, including gameplay systems, mechanics, animations, UI, menus, interactions, and existing features. Identify unfinished tasks yourself and complete them rather than leaving placeholders or partially implemented systems.
+
+Add full game controller support. The player must be able to navigate menus, play the entire game, interact with NPCs, fight, move, use inventory, drive vehicles, and access all gameplay features using a controller. Include proper button mappings, analog movement, configurable controls, and visual prompts showing the correct controller buttons. Ensure controller and keyboard/mouse support work independently and seamlessly.
+
+Finish the game editor tool completely. Make sure all editor features are functional, reliable, and properly integrated with the game. Complete any unfinished editor systems and ensure changes made in the editor correctly affect the actual game.
+
+Perform a complete testing and debugging pass across the game and editor. Fix remaining bugs, incomplete implementations, broken interactions, and compatibility issues. Ensure everything works correctly in the native desktop build.
+
+**IMPORTANT: From this point forward, this version is the official development baseline.** Complete and stabilize it, then use this exact version as the foundation for all future development. Do not revert to older builds or branch off into a different version. Preserve all existing completed systems, assets, mechanics, and content. Future updates must build directly upon this version.

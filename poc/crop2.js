@@ -1,0 +1,2 @@
+const { Canvas, loadImage } = require('../native/node_modules/skia-canvas'), fs = require('fs');
+(async () => { const im = await loadImage('D:/Unholium_native/fixes/doors.png'), c = new Canvas(900, 420); c.gpu = false; const x = c.getContext('2d'); x.drawImage(im, 40, 0, 120, 170, 0, 0, 280, 400); x.drawImage(im, 620, 260, 110, 150, 300, 0, 290, 400); x.drawImage(im, 1120, 260, 70, 150, 620, 0, 180, 400); fs.writeFileSync('D:/Unholium_native/poc/out/f/doors.png', await c.toBuffer('png')); })();

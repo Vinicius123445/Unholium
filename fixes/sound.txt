@@ -1,0 +1,1 @@
+the sound is working better than expected, but its chopping sometimes. find this issue and fix it

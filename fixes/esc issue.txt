@@ -1,0 +1,1 @@
+pressing esc makes the screen goes windowed for some reason. fix it

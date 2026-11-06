@@ -1,0 +1,1 @@
+window.addEventListener('load', () => setTimeout(() => { const pre = document.createElement('pre'); pre.id = 'res'; window.__mode='cv';PocAudio(window.OfflineAudioContext, (o) => { pre.textContent = JSON.stringify(o); document.body.appendChild(pre); }).catch((e) => { pre.textContent = String(e.stack); document.body.appendChild(pre); }); }, 300));

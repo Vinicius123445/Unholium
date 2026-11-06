@@ -1,0 +1,35 @@
+Make the NPC inventory system fully functional and realistic. NPCs must only be able to use items that actually exist in their inventories. They must not generate, access, or use items out of thin air.
+
+NPCs should also be able to:
+- Pick up items from the ground when they need them or consider them useful.
+- Evaluate nearby items and decide whether they are worth collecting.
+- Store collected items in their actual inventory.
+- Use, consume, equip, switch, drop, and transfer items based on their needs and decisions.
+- Keep track of item quantities and remove items when consumed or used.
+- Consider inventory capacity and available storage space.
+- Search their inventory before attempting to find or use an item.
+- Loot containers, corpses, and other accessible storage when appropriate.
+
+Make this system fully integrated with NPC AI and behavior. For example, an NPC with no ammunition must not be able to shoot a firearm. An NPC without food must find food before eating. An NPC without a weapon must find, steal, or acquire one before using it.
+
+NPCs should make these decisions autonomously according to their needs, personality, priorities, and circumstances.
+
+Ensure that all item interactions are physically and logically consistent with the actual game world. The inventory must be a real gameplay system, not just a visual list of items.
+
+Integrate the NPC inventory system with the Llama API and the NPC's generative AI.
+
+NPCs must be able to understand and respond to player requests involving physical items and inventory interactions.
+
+For example:
+- If the player asks an NPC to pick up a specific item from the ground and the NPC agrees, the NPC must physically walk to the item, pick it up, and add it to their actual inventory.
+- If the player asks an NPC to give them an item, the NPC must check whether they actually have it before agreeing.
+- If the player asks an NPC to use, equip, drop, or retrieve an item, the NPC must check whether the action is possible and execute it physically in the game world.
+- NPCs can refuse requests depending on their personality, relationships, current tasks, needs, loyalties, and circumstances.
+- NPCs must never claim to have picked up, given, used, or equipped something unless the corresponding action actually happened.
+- NPCs should be able to negotiate, ask questions, or explain why they cannot fulfill a request.
+
+**Important technical requirement:** The Llama API should handle understanding the player's intentions, interpreting requests, and deciding whether the NPC accepts or refuses. The actual inventory system and game engine must validate and execute all actions. AI responses must trigger real gameplay actions through structured commands, not merely generate descriptive text.
+
+Keep the AI and inventory synchronized at all times. NPCs must always know what they actually possess, and their dialogue must reflect their real inventory.
+
+Make this work with the existing NPC AI, Llama API integration, pathfinding, animations, interaction system, and inventory mechanics. Ensure the NPC visibly performs the requested action rather than simply saying that it did.
